@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>リクゾン - Super Dashboard</title>
+    <title>リクゾン - Tablet Perfect Dashboard</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -11,9 +11,11 @@
             margin: 0;
             padding: 20px;
             color: #333;
+            /* タッチ時のブラウザ固有の選択やハイライトを徹底的にオフ */
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
+            touch-action: none; /* 画面全体の勝手なスクロールやバウンスを禁止 */
         }
 
         h1 {
@@ -30,7 +32,6 @@
             margin-bottom: 20px;
         }
 
-        /* 🛠️ 上部コントロールエリア（検索 ＆ バックアップ） */
         .control-panel {
             max-width: 600px;
             margin: 0 auto 15px auto;
@@ -38,7 +39,6 @@
             gap: 10px;
         }
 
-        /* 🔍 検索バー */
         .search-bar {
             flex: 1;
             padding: 12px;
@@ -47,9 +47,10 @@
             font-size: 14px;
             outline: none;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            user-select: text;
+            -webkit-user-select: text; /* 検索窓だけは文字入力を許可 */
         }
 
-        /* 📥 バックアップボタン */
         .backup-trigger-btn {
             background-color: #7f8c8d;
             color: white;
@@ -59,10 +60,8 @@
             font-size: 13px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
-        /* リンク追加フォーム */
         .add-form {
             background-color: white;
             padding: 15px;
@@ -81,6 +80,8 @@
             border-radius: 8px;
             font-size: 14px;
             outline: none;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .add-form button {
@@ -91,16 +92,15 @@
             border-radius: 8px;
             font-size: 15px;
             font-weight: bold;
-            cursor: pointer;
         }
 
-        /* メインのグリッド配置 */
         .grid-container {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             max-width: 600px;
             margin: 0 auto;
+            position: relative;
         }
 
         @media (min-width: 600px) {
@@ -111,11 +111,9 @@
 
         .item-wrap {
             position: relative;
-            transition: transform 0.2s ease, opacity 0.2s ease;
             touch-action: none;
         }
 
-        /* 共通カードデザイン */
         .card {
             width: 100%;
             height: 90px;
@@ -127,13 +125,12 @@
             font-weight: bold;
             color: #34495e;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 5px;
-            transition: background-color 0.2s;
+            pointer-events: none; /* タッチ判定を親の item-wrap に一元化して誤動作防止 */
         }
 
         .card.folder-card {
@@ -144,40 +141,40 @@
 
         .folder-icon { font-size: 20px; }
 
-        /* 重なったときのハイライト */
+        /* 重なったとき（マージ可能状態）のハイライト */
         .item-wrap.hovered .card {
             background-color: #3498db !important;
             color: white !important;
             transform: scale(1.05);
         }
 
-        /* 🚀 フォルダから「外に出す」ときのドロップエリア用のハイライト */
+        /* フォルダ外へ出したときのハイライト */
         #folderModal.drag-over-out {
-            background-color: rgba(231, 76, 60, 0.4); /* 外に出すときは赤っぽく光る */
+            background-color: rgba(231, 76, 60, 0.4);
         }
 
-        /* 削除ボタン */
+        /* ❌ 削除ボタンのデザイン（iPadでも押しやすいように少し大きく、重なり順を最前面に） */
         .delete-btn {
             position: absolute;
-            top: -5px;
-            right: -5px;
-            width: 24px;
-            height: 24px;
+            top: -8px;
+            right: -8px;
+            width: 28px;
+            height: 28px;
             background-color: #e74c3c;
             color: white;
             border: none;
             border-radius: 50%;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
-            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            z-index: 10;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 100; /* 最前面に配置 */
+            pointer-events: auto; /* 削除ボタンのタップは独立して許可 */
         }
 
-        /* 編集モードのプルプル震えるアニメーション */
+        /* 編集モード時のプルプル揺れるアニメーション */
         @keyframes wiggle {
             0% { transform: rotate(-1deg); }
             50% { transform: rotate(1deg); }
@@ -188,11 +185,15 @@
             animation: wiggle 0.25s infinite ease-in-out;
         }
 
-        .item-wrap.dragging {
-            opacity: 0.5;
-            transform: scale(1.05);
-            z-index: 999;
-            animation: none;
+        /* iPadでの指での移動（ドラッグ）中のおしゃれな見た目 */
+        .item-wrap.absolute-dragging {
+            position: fixed !important;
+            pointer-events: none; /* 移動中のボタンが他の要素のタッチ判定を遮らないようにする */
+            opacity: 0.8;
+            transform: scale(1.1);
+            z-index: 9999;
+            animation: none !important;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
         }
 
         /* 📱 フォルダモーダル */
@@ -238,9 +239,11 @@
             background: transparent;
             outline: none;
             width: 80%;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
-        /* 🗃️ バックアップ・復元モーダル */
+        /* 📥 バックアップモーダル */
         .backup-content textarea {
             width: 100%;
             height: 120px;
@@ -252,23 +255,13 @@
             font-size: 12px;
             resize: none;
             margin-bottom: 15px;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
-        .backup-btns {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
+        .backup-btns { display: flex; gap: 10px; justify-content: center; }
+        .backup-btns button { border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
 
-        .backup-btns button {
-            border: none;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        /* 右下のボタンエリア */
         .bottom-btns {
             position: fixed;
             right: 20px;
@@ -286,7 +279,6 @@
             border: none;
             font-weight: bold;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -295,7 +287,6 @@
         .help-button { background-color: #3498db; color: white; font-size: 24px; }
         .done-button { background-color: #2ecc71; color: white; font-size: 14px; display: none; }
 
-        /* 説明書きなどの一般モーダル（共通） */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -312,34 +303,15 @@
             transition: opacity 0.3s ease;
         }
 
-        .modal-overlay.is-open {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .modal-content {
-            background-color: white;
-            padding: 25px;
-            border-radius: 16px;
-            width: 80%;
-            max-width: 350px;
-            text-align: center;
-        }
-
-        .close-button {
-            background-color: #e2e8f0;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+        .modal-overlay.is-open { opacity: 1; pointer-events: auto; }
+        .modal-content { background-color: white; padding: 25px; border-radius: 16px; width: 80%; max-width: 350px; text-align: center; }
+        .close-button { background-color: #e2e8f0; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <h1>リクゾン</h1>
-    <div class="sub-title">※長押しで編集モード。重ねてフォルダ化。フォルダ外へドラッグで取り出し。</div>
+    <div class="sub-title">※iPad対応：長押しでプルプル編集。重ねてフォルダ化。外側ドラッグで取り出し。</div>
 
     <div class="control-panel">
         <input type="text" id="searchBar" class="search-bar" placeholder="🔍 サイト名で爆速検索...">
@@ -372,8 +344,8 @@
     <div class="modal-overlay" id="backupModal">
         <div class="modal-content backup-content">
             <h3>データのバックアップと復元</h3>
-            <p style="font-size:12px; color:#666;">下の文字をコピーしてメモ帳等に保存するか、保存した文字をここに貼り付けて「復元」を押してください。</p>
-            <textarea id="backupTextarea" readonly></textarea>
+            <p style="font-size:12px; color:#666;">下の文字列をコピーして保存するか、貼り付けて復元してください。</p>
+            <textarea id="backupTextarea"></textarea>
             <div class="backup-btns">
                 <button id="importBtn" style="background-color:#2ecc71; color:white;">データを復元</button>
                 <button id="closeBackupBtn" style="background-color:#e2e8f0;">閉じる</button>
@@ -384,21 +356,19 @@
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal-content">
             <h3>リクゾンについて</h3>
-            <p>このアプリはよく使うリンクやショートカット集を保存しておくことができます。</p>
-            <p style="font-size:13px; text-align:left;">
-                ・**長押し:** 編集モード（プルプル震える）<br>
-                ・**重ねる:** フォルダにまとめる<br>
-                ・**取り出し:** フォルダ内のリンクを、白い箱の『外側（暗い背景部分）』へドラッグするとホームに戻せます。
-            </p>
+            <p>【iPadでの操作方法】<br>
+            ・**長押し(0.6秒):** ボタンが震えて編集モードになります。<br>
+            ・**重なり移動:** 震えたボタンを引きずり、他のボタンの上で離すとフォルダ化します。<br>
+            ・**外へ出す:** フォルダ内のボタンを引きずり、白い箱の『外側（薄暗い背景）』で離すと戻せます。</p>
             <button class="close-button" id="closeBtn">閉じる</button>
         </div>
     </div>
 
     <script>
-        // バージョン更新対策
-        if(!localStorage.getItem('rikuzon_v5_initialized')) {
+        // iPad対応の最新版としてキャッシュをクリア
+        if(!localStorage.getItem('rikuzon_v6_tablet_perfect')) {
             localStorage.clear();
-            localStorage.setItem('rikuzon_v5_initialized', 'true');
+            localStorage.setItem('rikuzon_v6_tablet_perfect', 'true');
         }
 
         const mainGrid = document.getElementById('mainGrid');
@@ -417,140 +387,200 @@
 
         let isEditMode = false;
         let longPressTimer;
-        
-        let dragSrcIndex = null; 
-        let currentTargetIndex = null; 
-        let currentOpenFolderIndex = null; 
-        let dragInsideFolderIndex = null; // フォルダ内でドラッグされたリンクのインデックス
+        let activeTouchId = null;
 
         const defaultData = [
             { type: 'link', name: 'Google', url: 'https://www.google.com' },
             { type: 'link', name: 'YouTube', url: 'https://www.youtube.com' }
         ];
 
-        let rikuzonData = JSON.parse(localStorage.getItem('rikuzon_v5_data'));
-        if (!rikuzonData) {
-            rikuzonData = defaultData;
-            saveData();
-        }
+        let rikuzonData = JSON.parse(localStorage.getItem('rikuzon_v6_data')) || defaultData;
+        function saveData() { localStorage.setItem('rikuzon_v6_data', JSON.stringify(rikuzonData)); }
 
-        function saveData() {
-            localStorage.setItem('rikuzon_v5_data', JSON.stringify(rikuzonData));
-        }
-
-        // メイン画面（ホーム）の表示（🔎 検索フィルター対応）
+        // メイン表示
         function displayMain(filterText = '') {
             mainGrid.innerHTML = '';
             const query = filterText.toLowerCase();
             
             rikuzonData.forEach((item, index) => {
-                // 検索キーワードが含まれているかチェック
                 if (query) {
                     if (item.type === 'link' && !item.name.toLowerCase().includes(query)) return;
-                    if (item.type === 'folder') {
-                        // フォルダ名、またはフォルダ内リンクに1つでもヒットすれば残す
-                        const hasMatch = item.name.toLowerCase().includes(query) || 
-                                         item.links.some(l => l.name.toLowerCase().includes(query));
-                        if (!hasMatch) return;
-                    }
+                    if (item.type === 'folder' && !item.name.toLowerCase().includes(query) && !item.links.some(l => l.name.toLowerCase().includes(query))) return;
                 }
 
                 const wrap = document.createElement('div');
                 wrap.className = 'item-wrap';
                 wrap.dataset.index = index;
 
-                const card = document.createElement('button');
+                const card = document.createElement('div'); // buttonからdivに変更してタッチのバッティングを防止
                 card.className = 'card';
-
-                if (item.type === 'link') {
-                    card.textContent = item.name;
-                } else if (item.type === 'folder') {
-                    card.classList.add('folder-card');
-                    card.innerHTML = `<span class="folder-icon">📂</span><span>${item.name} (${item.links.length})</span>`;
-                }
+                if (item.type === 'link') card.textContent = item.name;
+                else card.classList.add('folder-card'), card.innerHTML = `<span class="folder-icon">📂</span><span>${item.name} (${item.links.length})</span>`;
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-btn';
                 deleteBtn.textContent = '×';
-                deleteBtn.addEventListener('click', (event) => {
-                    event.stopPropagation();
+                
+                // iPadで確実に消せるタップ処理
+                const handleDelete = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
                     if (confirm(`「${item.name}」を本当に削除しますか？`)) {
                         rikuzonData.splice(index, 1);
                         saveData();
                         displayMain(searchBar.value);
                     }
-                });
+                };
+                deleteBtn.addEventListener('touchstart', handleDelete);
+                deleteBtn.addEventListener('click', handleDelete);
 
                 wrap.appendChild(card);
                 wrap.appendChild(deleteBtn);
 
-                setupDragAndMerge(wrap, item, index);
+                setupTabletTouch(wrap, item, index, false);
                 mainGrid.appendChild(wrap);
             });
         }
 
-        // ドラッグ ＆ マージ（重ね合わせ）の制御
-        function setupDragAndMerge(element, item, index) {
-            const startPress = (e) => {
+        // 📱 iPad・スマホに特化したタッチモーションシステム
+        function setupTabletTouch(element, item, index, isInsideFolder = false) {
+            let startX = 0, startY = 0;
+            let currentX = 0, currentY = 0;
+            let isDragging = false;
+            let clonedElement = null;
+            let targetWrap = null;
+
+            const onTouchStart = (e) => {
                 if (e.target.classList.contains('delete-btn')) return;
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                activeTouchId = touch.identifier;
+
+                // 0.6秒長押しで編集モード突入
                 longPressTimer = setTimeout(() => {
-                    if (!isEditMode) {
+                    if (!isEditMode && !isInsideFolder) {
                         isEditMode = true;
                         document.body.classList.add('edit-mode');
                         doneBtn.style.display = 'flex';
+                        if(navigator.vibrate) navigator.vibrate(50); // ブルッと一瞬震わせる演出
                     }
                 }, 600);
             };
 
-            const endPress = (e) => {
-                clearTimeout(longPressTimer);
-                if (!isEditMode && dragSrcIndex === null) {
-                    if (item.type === 'link') window.open(item.url, '_blank');
-                    if (item.type === 'folder') openFolder(item, index);
+            const onTouchMove = (e) => {
+                const touch = Array.from(e.touches).find(t => t.identifier === activeTouchId);
+                if (!touch) return;
+
+                currentX = touch.clientX;
+                currentY = touch.clientY;
+
+                // まだ長押し中に指が大きく動いたら、長押しタイマーをキャンセル
+                if (!isEditMode && !isInsideFolder) {
+                    if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startY) > 10) {
+                        clearTimeout(longPressTimer);
+                    }
+                    return; 
+                }
+
+                // 編集モード中（またはフォルダ内ドラッグ）なら、引きずり移動を開始
+                if (isEditMode || isInsideFolder) {
+                    if (!isDragging) {
+                        isDragging = true;
+                        // 指の下に表示するためのクローン（身代わりボタン）を作成
+                        clonedElement = element.cloneNode(true);
+                        clonedElement.classList.add('absolute-dragging');
+                        clonedElement.querySelector('.delete-btn').style.display = 'none';
+                        document.body.appendChild(clonedElement);
+                        element.style.opacity = '0.3'; // 元の場所にあるボタンを薄くする
+                    }
+
+                    // 身代わりボタンを指の真下に移動させる
+                    clonedElement.style.left = `${currentX - 50}px`;
+                    clonedElement.style.top = `${currentY - 45}px`;
+
+                    if (!isInsideFolder) {
+                        // メイン画面上での重なり判定
+                        clonedElement.style.display = 'none'; // 判定の邪魔にならないよう一瞬隠す
+                        const overElement = document.elementFromPoint(currentX, currentY);
+                        clonedElement.style.display = 'flex';
+
+                        // 全てのハイライトを一旦リセット
+                        document.querySelectorAll('.item-wrap').forEach(el => el.classList.remove('hovered'));
+                        targetWrap = overElement ? overElement.closest('#mainGrid .item-wrap') : null;
+
+                        if (targetWrap && targetWrap.dataset.index != index) {
+                            targetWrap.classList.add('hovered'); // 重なった相手を青く光らせる
+                        } else {
+                            targetWrap = null;
+                        }
+                    } else {
+                        // フォルダ内から外に出す判定
+                        const overElement = document.elementFromPoint(currentX, currentY);
+                        const insideModalContent = overElement ? overElement.closest('#folderContent') : null;
+                        if (!insideModalContent) {
+                            folderModal.classList.add('drag-over-out'); // 白い箱の外側（背景）にいるときは赤く光る
+                        } else {
+                            folderModal.classList.remove('drag-over-out');
+                        }
+                    }
                 }
             };
 
-            element.addEventListener('touchstart', startPress, {passive: true});
-            element.addEventListener('touchend', endPress);
-            element.addEventListener('touchmove', () => clearTimeout(longPressTimer), {passive: true});
-            element.addEventListener('mousedown', startPress);
-            element.addEventListener('mouseup', endPress);
-            element.addEventListener('mousemove', () => clearTimeout(longPressTimer));
+            const onTouchEnd = (e) => {
+                clearTimeout(longPressTimer);
+                
+                if (isDragging) {
+                    isDragging = false;
+                    if (clonedElement) clonedElement.remove();
+                    element.style.opacity = '1';
 
-            element.draggable = true;
-            element.addEventListener('dragstart', (e) => {
-                if (!isEditMode) { e.preventDefault(); return; }
-                dragSrcIndex = index;
-                element.classList.add('dragging');
-            });
+                    if (!isInsideFolder) {
+                        // ホーム画面でのマージ処理
+                        document.querySelectorAll('.item-wrap').forEach(el => el.classList.remove('hovered'));
+                        if (targetWrap) {
+                            const targetIndex = parseInt(targetWrap.dataset.index);
+                            mergeItems(index, targetIndex);
+                        }
+                    } else {
+                        // フォルダ外へ出す処理
+                        const overElement = document.elementFromPoint(currentX, currentY);
+                        const insideModalContent = overElement ? overElement.closest('#folderContent') : null;
+                        folderModal.classList.remove('drag-over-out');
 
-            element.addEventListener('dragenter', (e) => {
-                e.preventDefault();
-                if (!isEditMode || dragSrcIndex === null || dragSrcIndex === index) return;
-                currentTargetIndex = index;
-                element.classList.add('hovered');
-            });
-
-            element.addEventListener('dragover', (e) => e.preventDefault());
-            element.addEventListener('dragleave', () => {
-                element.classList.remove('hovered');
-                if (currentTargetIndex === index) currentTargetIndex = null;
-            });
-
-            element.addEventListener('dragend', () => {
-                element.classList.remove('dragging');
-                document.querySelectorAll('.item-wrap').forEach(el => el.classList.remove('hovered'));
-                if (currentTargetIndex !== null && dragSrcIndex !== null && dragSrcIndex !== currentTargetIndex) {
-                    mergeItems(dragSrcIndex, currentTargetIndex);
+                        if (!insideModalContent && currentOpenFolderIndex !== null) {
+                            // フォルダの外側で離されたら、ホーム画面へ取り出す
+                            const folderItem = rikuzonData[currentOpenFolderIndex];
+                            const extractedLink = folderItem.links.splice(index, 1)[0];
+                            rikuzonData.push({ type: 'link', name: extractedLink.name, url: extractedLink.url });
+                            
+                            if (folderItem.links.length === 0) rikuzonData.splice(currentOpenFolderIndex, 1), folderModal.classList.remove('is-open');
+                            
+                            saveData();
+                            displayMain(searchBar.value);
+                            if (folderItem.links.length > 0) openFolder(folderItem, currentOpenFolderIndex);
+                        }
+                    }
+                } else {
+                    // ドラッグしなかった ＝ 普通のタップ処理
+                    if (!isEditMode && !isInsideFolder) {
+                        if (item.type === 'link') window.open(item.url, '_blank');
+                        if (item.type === 'folder') openFolder(item, index);
+                    }
                 }
-                dragSrcIndex = null;
-                currentTargetIndex = null;
-            });
+                activeTouchId = null;
+            };
+
+            element.addEventListener('touchstart', onTouchStart, {passive: true});
+            element.addEventListener('touchmove', onTouchMove, {passive: true});
+            element.addEventListener('touchend', onTouchEnd);
         }
 
         function mergeItems(srcIdx, targetIdx) {
             const srcItem = rikuzonData[srcIdx];
             const targetItem = rikuzonData[targetIdx];
+            if (!srcItem || !targetItem) return;
+
             if (srcItem.type === 'link' && targetItem.type === 'link') {
                 const newFolder = { type: 'folder', name: '新規フォルダ', links: [targetItem, srcItem] };
                 if (srcIdx > targetIdx) {
@@ -566,7 +596,7 @@
             displayMain(searchBar.value);
         }
 
-        // 📱 フォルダを開く ＆ 【機能1：取り出し対応ドラッグ】
+        // フォルダ展開
         function openFolder(folderItem, folderIndex) {
             currentOpenFolderIndex = folderIndex;
             currentFolderTitle.value = folderItem.name;
@@ -576,94 +606,51 @@
                 const wrap = document.createElement('div');
                 wrap.className = 'item-wrap';
 
-                const card = document.createElement('button');
+                const card = document.createElement('div');
                 card.className = 'card';
                 card.textContent = link.name;
-                card.addEventListener('click', () => {
-                    if(!isEditMode) window.open(link.url, '_blank');
+
+                // フォルダ内の通常タップでリンクを開く
+                wrap.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-btn')) return;
+                    window.open(link.url, '_blank');
                 });
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-btn';
                 deleteBtn.textContent = '×';
-                deleteBtn.addEventListener('click', (event) => {
-                    event.stopPropagation();
+                
+                const handleDeleteInFolder = (e) => {
+                    e.stopPropagation(); e.preventDefault();
                     if (confirm(`フォルダ内の「${link.name}」を本当に削除しますか？`)) {
                         folderItem.links.splice(linkIndex, 1);
-                        checkFolderEmpty(folderIndex);
-                        saveData();
-                        displayMain(searchBar.value);
+                        if (folderItem.links.length === 0) rikuzonData.splice(folderIndex, 1), folderModal.classList.remove('is-open');
+                        saveData(); displayMain(searchBar.value);
                         if (folderItem.links.length > 0) openFolder(folderItem, folderIndex);
                     }
-                });
+                };
+                deleteBtn.addEventListener('touchstart', handleDeleteInFolder);
+                deleteBtn.addEventListener('click', handleDeleteInFolder);
 
                 wrap.appendChild(card);
                 wrap.appendChild(deleteBtn);
 
-                // 📂 フォルダ内リンクのドラッグ設定（外に出す用）
-                wrap.draggable = true;
-                wrap.addEventListener('dragstart', () => {
-                    dragInsideFolderIndex = linkIndex;
-                    wrap.classList.add('dragging');
-                });
-                wrap.addEventListener('dragend', () => {
-                    wrap.classList.remove('dragging');
-                    folderModal.classList.remove('drag-over-out');
-                    dragInsideFolderIndex = null;
-                });
-
+                // フォルダ内のリンクもiPadドラッグ（外に出す用）を設定
+                setupTabletTouch(wrap, link, linkIndex, true);
                 folderGrid.appendChild(wrap);
             });
 
             folderModal.classList.add('is-open');
         }
 
-        // ★ フォルダの外側（グレー背景）にドロップされたら「ホームに取り出す」処理
-        folderModal.addEventListener('dragover', (e) => e.preventDefault());
-        folderModal.addEventListener('dragenter', (e) => {
-            // 白枠(folderContent)以外＝外側のグレー背景のときだけ赤く光らせる
-            if (e.target === folderModal) folderModal.classList.add('drag-over-out');
-        });
-        folderModal.addEventListener('dragleave', (e) => {
-            if (e.target === folderModal) folderModal.classList.remove('drag-over-out');
-        });
-        folderModal.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (e.target === folderModal && dragInsideFolderIndex !== null && currentOpenFolderIndex !== null) {
-                // フォルダから該当のリンクを抜き取る
-                const folderItem = rikuzonData[currentOpenFolderIndex];
-                const extractedLink = folderItem.links.splice(dragInsideFolderIndex, 1)[0];
-                
-                // ホーム画面（独立した通常リンク）として末尾に追加
-                rikuzonData.push({ type: 'link', name: extractedLink.name, url: extractedLink.url });
-                
-                // フォルダが空になったかチェック
-                checkFolderEmpty(currentOpenFolderIndex);
-                
-                saveData();
-                displayMain(searchBar.value);
-                
-                // まだ中身があればフォルダを開き直す、空なら閉じる
-                if (folderItem.links && folderItem.links.length > 0) {
-                    openFolder(folderItem, currentOpenFolderIndex);
-                } else {
-                    folderModal.classList.remove('is-open');
-                }
-            }
+        // 完了ボタン
+        doneBtn.addEventListener('click', () => {
+            isEditMode = false; document.body.classList.remove('edit-mode'); doneBtn.style.display = 'none';
         });
 
-        function checkFolderEmpty(folderIndex) {
-            if (rikuzonData[folderIndex].links.length === 0) {
-                rikuzonData.splice(folderIndex, 1);
-            }
-        }
+        searchBar.addEventListener('input', () => displayMain(searchBar.value));
 
-        // 🔍 【機能4】検索バーのリアルタイム連動
-        searchBar.addEventListener('input', () => {
-            displayMain(searchBar.value);
-        });
-
-        // 📥 【機能5】バックアップ・復元システム
+        // バックアップ管理
         const backupTriggerBtn = document.getElementById('backupTriggerBtn');
         const backupModal = document.getElementById('backupModal');
         const backupTextarea = document.getElementById('backupTextarea');
@@ -671,48 +658,28 @@
         const closeBackupBtn = document.getElementById('closeBackupBtn');
 
         backupTriggerBtn.addEventListener('click', () => {
-            // 開いた瞬間に、現在のデータをテキスト化してtextareaに流し込む（バックアップ用）
             backupTextarea.value = btoa(unescape(encodeURIComponent(JSON.stringify(rikuzonData))));
-            backupTextarea.removeAttribute('readonly'); // 復元のために編集可能にする
             backupModal.classList.add('is-open');
         });
-
         importBtn.addEventListener('click', () => {
             try {
                 const text = backupTextarea.value.trim();
-                const decodedData = JSON.parse(decodeURIComponent(escape(atob(text))));
-                if (Array.isArray(decodedData)) {
-                    rikuzonData = decodedData;
-                    saveData();
-                    displayMain();
-                    backupModal.classList.remove('is-open');
-                    alert('データの復元に成功しました！');
-                } else {
-                    alert('データ形式が正しくありません。');
-                }
-            } catch (e) {
-                alert('復元に失敗しました。正しいバックアップコードを入力してください。');
-            }
+                rikuzonData = JSON.parse(decodeURIComponent(escape(atob(text))));
+                saveData(); displayMain(); backupModal.classList.remove('is-open'); alert('復元に成功しました！');
+            } catch (e) { alert('正しいコードを入力してください。'); }
         });
-
         closeBackupBtn.addEventListener('click', () => backupModal.classList.remove('is-open'));
 
-        // フォーム追加処理
+        // リンク追加
         addBtn.addEventListener('click', () => {
-            const name = siteNameInput.value.trim();
-            let url = siteUrlInput.value.trim();
-            const folderName = folderNameInput.value.trim();
+            const name = siteNameInput.value.trim(); let url = siteUrlInput.value.trim(); const folderName = folderNameInput.value.trim();
             if (!name || !url) { alert('サイト名とURLを入力してください。'); return; }
             if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
-            if (folderName === "") {
-                rikuzonData.push({ type: 'link', name: name, url: url });
-            } else {
+            if (folderName === "") rikuzonData.push({ type: 'link', name: name, url: url });
+            else {
                 let folder = rikuzonData.find(item => item.type === 'folder' && item.name === folderName);
-                if (!folder) {
-                    folder = { type: 'folder', name: folderName, links: [] };
-                    rikuzonData.push(folder);
-                }
+                if (!folder) { folder = { type: 'folder', name: folderName, links: [] }; rikuzonData.push(folder); }
                 folder.links.push({ name: name, url: url });
             }
             saveData(); displayMain(searchBar.value);
@@ -720,23 +687,15 @@
         });
 
         currentFolderTitle.addEventListener('input', () => {
-            if (currentOpenFolderIndex !== null) {
-                rikuzonData[currentOpenFolderIndex].name = currentFolderTitle.value.trim() || 'フォルダ';
-                saveData(); displayMain(searchBar.value);
-            }
+            if (currentOpenFolderIndex !== null) { rikuzonData[currentOpenFolderIndex].name = currentFolderTitle.value.trim() || 'フォルダ'; saveData(); displayMain(searchBar.value); }
         });
 
-        doneBtn.addEventListener('click', () => {
-            isEditMode = false; document.body.classList.remove('edit-mode'); doneBtn.style.display = 'none';
-        });
         closeFolderBtn.addEventListener('click', () => folderModal.classList.remove('is-open'));
-        
         const helpBtn = document.getElementById('helpBtn');
         const modalOverlay = document.getElementById('modalOverlay');
         const closeBtn = document.getElementById('closeBtn');
         helpBtn.addEventListener('click', () => modalOverlay.classList.add('is-open'));
         closeBtn.addEventListener('click', () => modalOverlay.classList.remove('is-open'));
-        modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('is-open'); });
 
         displayMain();
     </script>
