@@ -11,11 +11,10 @@
             margin: 0;
             padding: 20px;
             color: #333;
-            /* タッチ時のブラウザ固有の選択やハイライトを徹底的にオフ */
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none; /* 画面全体の勝手なスクロールやバウンスを禁止 */
+            touch-action: none; 
         }
 
         h1 {
@@ -48,7 +47,7 @@
             outline: none;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             user-select: text;
-            -webkit-user-select: text; /* 検索窓だけは文字入力を許可 */
+            -webkit-user-select: text; 
         }
 
         .backup-trigger-btn {
@@ -114,6 +113,7 @@
             touch-action: none;
         }
 
+        /* 共通カードデザイン（aタグに変更されたため、テキストの下線を消すなどの処理を追加） */
         .card {
             width: 100%;
             height: 90px;
@@ -130,30 +130,30 @@
             align-items: center;
             justify-content: center;
             gap: 5px;
-            pointer-events: none; /* タッチ判定を親の item-wrap に一元化して誤動作防止 */
+            transition: background-color 0.2s;
+            text-decoration: none; /* リンクの下線を消す */
+            -webkit-user-drag: none; /* ブラウザ標準の画像ドラッグをオフに */
         }
 
         .card.folder-card {
             background-color: #e2e8f0;
             border: 2px dashed #cbd5e1;
             color: #2c3e50;
+            cursor: pointer;
         }
 
         .folder-icon { font-size: 20px; }
 
-        /* 重なったとき（マージ可能状態）のハイライト */
         .item-wrap.hovered .card {
             background-color: #3498db !important;
             color: white !important;
             transform: scale(1.05);
         }
 
-        /* フォルダ外へ出したときのハイライト */
         #folderModal.drag-over-out {
             background-color: rgba(231, 76, 60, 0.4);
         }
 
-        /* ❌ 削除ボタンのデザイン（iPadでも押しやすいように少し大きく、重なり順を最前面に） */
         .delete-btn {
             position: absolute;
             top: -8px;
@@ -170,11 +170,10 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            z-index: 100; /* 最前面に配置 */
-            pointer-events: auto; /* 削除ボタンのタップは独立して許可 */
+            z-index: 100; 
+            pointer-events: auto; 
         }
 
-        /* 編集モード時のプルプル揺れるアニメーション */
         @keyframes wiggle {
             0% { transform: rotate(-1deg); }
             50% { transform: rotate(1deg); }
@@ -185,10 +184,9 @@
             animation: wiggle 0.25s infinite ease-in-out;
         }
 
-        /* iPadでの指での移動（ドラッグ）中のおしゃれな見た目 */
         .item-wrap.absolute-dragging {
             position: fixed !important;
-            pointer-events: none; /* 移動中のボタンが他の要素のタッチ判定を遮らないようにする */
+            pointer-events: none; 
             opacity: 0.8;
             transform: scale(1.1);
             z-index: 9999;
@@ -243,7 +241,6 @@
             -webkit-user-select: text;
         }
 
-        /* 📥 バックアップモーダル */
         .backup-content textarea {
             width: 100%;
             height: 120px;
@@ -359,18 +356,12 @@
             <p>【iPadでの操作方法】<br>
             ・**長押し(0.6秒):** ボタンが震えて編集モードになります。<br>
             ・**重なり移動:** 震えたボタンを引きずり、他のボタンの上で離すとフォルダ化します。<br>
-            ・**外へ出す:** フォルダ内のボタンを引きずり、白い箱の『外側（薄暗い背景）』で離すと戻せます。</p>
+            ・**外へ出す:** フォルダ内のボタンを引きずり、白い箱の『外側（暗い背景）』で離すと戻せます。</p>
             <button class="close-button" id="closeBtn">閉じる</button>
         </div>
     </div>
 
     <script>
-        // iPad対応の最新版としてキャッシュをクリア
-        if(!localStorage.getItem('rikuzon_v6_tablet_perfect')) {
-            localStorage.clear();
-            localStorage.setItem('rikuzon_v6_tablet_perfect', 'true');
-        }
-
         const mainGrid = document.getElementById('mainGrid');
         const folderGrid = document.getElementById('folderGrid');
         const folderModal = document.getElementById('folderModal');
@@ -412,16 +403,24 @@
                 wrap.className = 'item-wrap';
                 wrap.dataset.index = index;
 
-                const card = document.createElement('div'); // buttonからdivに変更してタッチのバッティングを防止
-                card.className = 'card';
-                if (item.type === 'link') card.textContent = item.name;
-                else card.classList.add('folder-card'), card.innerHTML = `<span class="folder-icon">📂</span><span>${item.name} (${item.links.length})</span>`;
+                // ★ 通常リンクは <a> タグに変更。フォルダは <div> のまま。
+                let card;
+                if (item.type === 'link') {
+                    card = document.createElement('a');
+                    card.className = 'card';
+                    card.textContent = item.name;
+                    card.href = item.url;
+                    card.target = '_blank'; // 新しいタブで開く
+                } else {
+                    card = document.createElement('div');
+                    card.className = 'card folder-card';
+                    card.innerHTML = `<span class="folder-icon">📂</span><span>${item.name} (${item.links.length})</span>`;
+                }
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-btn';
                 deleteBtn.textContent = '×';
                 
-                // iPadで確実に消せるタップ処理
                 const handleDelete = (e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -437,18 +436,25 @@
                 wrap.appendChild(card);
                 wrap.appendChild(deleteBtn);
 
-                setupTabletTouch(wrap, item, index, false);
+                setupTabletTouch(wrap, card, item, index, false);
                 mainGrid.appendChild(wrap);
             });
         }
 
-        // 📱 iPad・スマホに特化したタッチモーションシステム
-        function setupTabletTouch(element, item, index, isInsideFolder = false) {
+        // 📱 iPadタッチシステム
+        function setupTabletTouch(wrapElement, cardElement, item, index, isInsideFolder = false) {
             let startX = 0, startY = 0;
             let currentX = 0, currentY = 0;
             let isDragging = false;
             let clonedElement = null;
             let targetWrap = null;
+
+            // ★ 編集モード（プルプル中）のときは、リンク移動を防ぐためにクリックを無効化する
+            cardElement.addEventListener('click', (e) => {
+                if (isEditMode) {
+                    e.preventDefault(); // 編集モード時はサイトへの移動を止める
+                }
+            });
 
             const onTouchStart = (e) => {
                 if (e.target.classList.contains('delete-btn')) return;
@@ -457,13 +463,11 @@
                 startY = touch.clientY;
                 activeTouchId = touch.identifier;
 
-                // 0.6秒長押しで編集モード突入
                 longPressTimer = setTimeout(() => {
                     if (!isEditMode && !isInsideFolder) {
                         isEditMode = true;
                         document.body.classList.add('edit-mode');
                         doneBtn.style.display = 'flex';
-                        if(navigator.vibrate) navigator.vibrate(50); // ブルッと一瞬震わせる演出
                     }
                 }, 600);
             };
@@ -475,7 +479,6 @@
                 currentX = touch.clientX;
                 currentY = touch.clientY;
 
-                // まだ長押し中に指が大きく動いたら、長押しタイマーをキャンセル
                 if (!isEditMode && !isInsideFolder) {
                     if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startY) > 10) {
                         clearTimeout(longPressTimer);
@@ -483,43 +486,39 @@
                     return; 
                 }
 
-                // 編集モード中（またはフォルダ内ドラッグ）なら、引きずり移動を開始
+                // 編集モード中、ドラッグが始まったらリンク移動の誤動作を完全に防ぐ
                 if (isEditMode || isInsideFolder) {
+                    e.preventDefault(); 
                     if (!isDragging) {
                         isDragging = true;
-                        // 指の下に表示するためのクローン（身代わりボタン）を作成
-                        clonedElement = element.cloneNode(true);
+                        clonedElement = wrapElement.cloneNode(true);
                         clonedElement.classList.add('absolute-dragging');
                         clonedElement.querySelector('.delete-btn').style.display = 'none';
                         document.body.appendChild(clonedElement);
-                        element.style.opacity = '0.3'; // 元の場所にあるボタンを薄くする
+                        wrapElement.style.opacity = '0.3';
                     }
 
-                    // 身代わりボタンを指の真下に移動させる
                     clonedElement.style.left = `${currentX - 50}px`;
                     clonedElement.style.top = `${currentY - 45}px`;
 
                     if (!isInsideFolder) {
-                        // メイン画面上での重なり判定
-                        clonedElement.style.display = 'none'; // 判定の邪魔にならないよう一瞬隠す
+                        clonedElement.style.display = 'none';
                         const overElement = document.elementFromPoint(currentX, currentY);
                         clonedElement.style.display = 'flex';
 
-                        // 全てのハイライトを一旦リセット
                         document.querySelectorAll('.item-wrap').forEach(el => el.classList.remove('hovered'));
                         targetWrap = overElement ? overElement.closest('#mainGrid .item-wrap') : null;
 
                         if (targetWrap && targetWrap.dataset.index != index) {
-                            targetWrap.classList.add('hovered'); // 重なった相手を青く光らせる
+                            targetWrap.classList.add('hovered');
                         } else {
                             targetWrap = null;
                         }
                     } else {
-                        // フォルダ内から外に出す判定
                         const overElement = document.elementFromPoint(currentX, currentY);
                         const insideModalContent = overElement ? overElement.closest('#folderContent') : null;
                         if (!insideModalContent) {
-                            folderModal.classList.add('drag-over-out'); // 白い箱の外側（背景）にいるときは赤く光る
+                            folderModal.classList.add('drag-over-out');
                         } else {
                             folderModal.classList.remove('drag-over-out');
                         }
@@ -533,23 +532,20 @@
                 if (isDragging) {
                     isDragging = false;
                     if (clonedElement) clonedElement.remove();
-                    element.style.opacity = '1';
+                    wrapElement.style.opacity = '1';
 
                     if (!isInsideFolder) {
-                        // ホーム画面でのマージ処理
                         document.querySelectorAll('.item-wrap').forEach(el => el.classList.remove('hovered'));
                         if (targetWrap) {
                             const targetIndex = parseInt(targetWrap.dataset.index);
                             mergeItems(index, targetIndex);
                         }
                     } else {
-                        // フォルダ外へ出す処理
                         const overElement = document.elementFromPoint(currentX, currentY);
                         const insideModalContent = overElement ? overElement.closest('#folderContent') : null;
                         folderModal.classList.remove('drag-over-out');
 
                         if (!insideModalContent && currentOpenFolderIndex !== null) {
-                            // フォルダの外側で離されたら、ホーム画面へ取り出す
                             const folderItem = rikuzonData[currentOpenFolderIndex];
                             const extractedLink = folderItem.links.splice(index, 1)[0];
                             rikuzonData.push({ type: 'link', name: extractedLink.name, url: extractedLink.url });
@@ -562,18 +558,17 @@
                         }
                     }
                 } else {
-                    // ドラッグしなかった ＝ 普通のタップ処理
-                    if (!isEditMode && !isInsideFolder) {
-                        if (item.type === 'link') window.open(item.url, '_blank');
-                        if (item.type === 'folder') openFolder(item, index);
+                    // ★ 編集モードではなく、ドラッグもしていない単なるタップで、かつフォルダだった場合のみモーダルを開く
+                    if (!isEditMode && !isInsideFolder && item.type === 'folder') {
+                        openFolder(item, index);
                     }
                 }
                 activeTouchId = null;
             };
 
-            element.addEventListener('touchstart', onTouchStart, {passive: true});
-            element.addEventListener('touchmove', onTouchMove, {passive: true});
-            element.addEventListener('touchend', onTouchEnd);
+            wrapElement.addEventListener('touchstart', onTouchStart, {passive: true});
+            wrapElement.addEventListener('touchmove', onTouchMove, {passive: false}); // 画面スクロールを完全に抑え込むため false
+            wrapElement.addEventListener('touchend', onTouchEnd);
         }
 
         function mergeItems(srcIdx, targetIdx) {
@@ -606,15 +601,12 @@
                 const wrap = document.createElement('div');
                 wrap.className = 'item-wrap';
 
-                const card = document.createElement('div');
+                // フォルダの中の通常リンクも <a> タグにする
+                const card = document.createElement('a');
                 card.className = 'card';
                 card.textContent = link.name;
-
-                // フォルダ内の通常タップでリンクを開く
-                wrap.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('delete-btn')) return;
-                    window.open(link.url, '_blank');
-                });
+                card.href = link.url;
+                card.target = '_blank';
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-btn';
@@ -635,8 +627,7 @@
                 wrap.appendChild(card);
                 wrap.appendChild(deleteBtn);
 
-                // フォルダ内のリンクもiPadドラッグ（外に出す用）を設定
-                setupTabletTouch(wrap, link, linkIndex, true);
+                setupTabletTouch(wrap, card, link, linkIndex, true);
                 folderGrid.appendChild(wrap);
             });
 
